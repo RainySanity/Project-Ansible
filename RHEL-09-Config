@@ -83,6 +83,18 @@
         append: true
         create_home: true
 
+    - name: Manage the RHEL web console
+      hosts: managed-node-01.example.com
+        tasks:
+    - name: Install RHEL web console
+      ansible.builtin.include_role:
+        name: rhel-system-roles.cockpit
+      vars:
+        cockpit_packages: default
+        cockpit_port: 9050
+        cockpit_manage_selinux: true
+        cockpit_manage_firewall: true
+
     - name: Reboot host(s)
       ansible.builtin.reboot:
         msg: "Reboot by Ansible to apply changes on {{ play_hosts | length }} server(s)"
