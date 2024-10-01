@@ -1,1 +1,93 @@
 
+- hosts: "all"
+  become: yes
+  gather_facts: yes
+  tasks:
+
+    - name: Check if the system is RedHat-based
+      ansible.builtin.fail:
+        msg: "This playbook can only be run on RedHat-based systems."
+      when: ansible_facts['os_family'] != "RedHat"
+
+    - name: Continue if the system is RedHat-based
+      debug:
+        msg: "The system is RedHat-based, continuing with the playbook."
+
+    - name: Upgrade all packages
+       dnf:
+        name: "*"
+        state: latest
+
+    - name: Autoremove unneeded packages installed as dependencies
+      dnf:
+        autoremove: yes
+    
+    - name: Notify about package updates
+      debug:
+        msg: "All packages have been successfully updated"
+
+    - name: Install the latest version of Apache and MariaDB
+      dnf:
+       name:
+        - nano
+        - cockpit
+      state: latest
+
+    - name: Set the host number based on inventory host position
+      set_fact:
+        host_number: "{{ (play_hosts.index(inventory_hostname) + 1) }}"
+
+    - name: Set a new hostname with an incrementing number
+      ansible.builtin.hostname:
+        name: "RHEL-SRV-{{ host_number }}"
+    
+    - name: Ensure the new hostname is written to /etc/hostname
+      ansible.builtin.lineinfile:
+        path: /etc/hostname
+        line: "Ubuntu-SRV-{{ host_number }}"
+        create: yes
+
+    - name: Update /etc/hosts with new hostname
+      ansible.builtin.lineinfile:
+        path: /etc/hosts
+        regexp: '^127\.0\.1\.1\s+'
+        line: "127.0.1.1 host-{{ host_number }}"
+        create: yes
+
+    - name: Display the new hostname
+      debug:
+        msg: "The hostname has been set to Ubuntu-SRV-{{ host_number }}"
+
+    - name: UFW - Allow SSH connections
+      community.general.ufw:
+        rule: allow
+        name: OpenSSH
+
+    - name: UFW - Enable and deny by default
+      community.general.ufw:
+        state: enabled
+        default: deny
+      register: ufw_result
+
+    - name: Notify about Firewall Status
+      debug:
+        msg: "The Firewall is engaged and in action, robustly blocking unauthorized traffic to keep your network secure!"
+      when: ufw_result.changed
+
+    - name: Create a new regular user with sudo privileges
+      user:
+        name: admin
+        state: present
+        groups: sudo
+        shell: /bin/bash
+        append: true
+        create_home: true
+
+    - name: Reboot host(s)
+      ansible.builtin.reboot:
+        msg: "Reboot by Ansible to apply changes on {{ play_hosts | length }} server(s)"
+        pre_reboot_delay: 15
+        post_reboot_delay: 10
+        
+
+      
